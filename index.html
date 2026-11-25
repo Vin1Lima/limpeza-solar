@@ -22,7 +22,7 @@
 :root{
   color-scheme:dark;
   /* tema escuro "Solar" */
-  --bg:#14110F; --tx:#F3EEE8; --ok:#F5A524; --no:#E5484D;
+  --bg:#14110F; --tx:#F3EEE8; --ok:#F5A524; --no:#E5484D; --on:#3DD68C;
   --linha:rgba(243,238,232,.12);
   --suave:rgba(243,238,232,.05);
   --sel:rgba(243,238,232,.16);
@@ -33,7 +33,7 @@
 /* ---------- tema claro: mesmo layout ---------- */
 html[data-tema="claro"]{
   color-scheme:light;
-  --bg:#FFFFFF; --tx:#111111; --ok:#2563EB; --no:#E11D48;
+  --bg:#FFFFFF; --tx:#111111; --ok:#2563EB; --no:#E11D48; --on:#16A34A;
   --linha:rgba(17,17,17,.10);
   --suave:rgba(17,17,17,.035);
   --sel:#FFFFFF;
@@ -58,7 +58,7 @@ button,input{font:inherit;color:inherit;touch-action:manipulation}
 .cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 h1{font-size:clamp(19px,5.5vw,22px);font-weight:700}
 .con{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mudo);white-space:nowrap}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--on);flex-shrink:0}
 .off .dot{background:var(--no)}
 .espera .dot{background:var(--mudo);animation:pisca 1s ease-in-out infinite alternate}
 @keyframes pisca{to{opacity:.3}}
@@ -80,7 +80,7 @@ html[data-tema="claro"] .tema .lua{display:block}
   background:var(--suave);border:1px solid var(--no);
   background:color-mix(in srgb,var(--no) 12%,transparent)}
 .aviso b{color:var(--no)}
-.travado .aba,.travado .rodape .btn{opacity:.45;pointer-events:none}
+.travado .aba:not(#aba3),.travado .rodape .btn{opacity:.45;pointer-events:none}
 
 /* ---------- abas ---------- */
 .aba{display:none;gap:var(--gap);padding-top:4px;transition:opacity .2s}
@@ -169,6 +169,22 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
 .modal .acoes{display:grid;gap:8px;margin-top:18px}
 .perigo{background:var(--no);color:var(--sobreNo)}
 .sec{background:transparent;border:1px solid var(--linha)}
+.tabs{grid-template-columns:repeat(4,1fr)!important}
+.tabs button{font-size:13px!important}
+/* ---------- aba Registros ---------- */
+a.btn{text-align:center;text-decoration:none;color:inherit}
+a.btn.prim{color:var(--sobreOk)}
+.acoes2{display:grid;gap:8px;margin-top:12px}
+.lista{display:grid;gap:6px;margin-top:10px;max-height:460px;overflow:auto}
+.ev{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;padding:8px 10px;border-radius:10px;
+  background:var(--bg);border:1px solid var(--linha);font-size:13px;-webkit-user-select:text;user-select:text}
+.ev .q{grid-row:span 2;color:var(--mudo);font-size:12px;line-height:1.3;white-space:pre;font-variant-numeric:tabular-nums}
+.ev b{font-size:14px}
+.ev .d{color:var(--mudo);word-break:break-word}
+.ev.bom b{color:var(--on)} .ev.ruim b{color:var(--no)}
+.metricas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0;text-align:center}
+.metricas b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.metricas span{font-size:11px;color:var(--mudo)}
 @media (min-width:720px){
   .app{max-width:720px}
   .aba.ativa{grid-template-columns:1fr 1fr}
@@ -232,6 +248,7 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
       <button id="tab0" role="tab" onclick="aba(0)">Limpeza</button>
       <button id="tab1" role="tab" onclick="aba(1)">Automático</button>
       <button id="tab2" role="tab" onclick="aba(2)">Manual</button>
+      <button id="tab3" role="tab" onclick="aba(3)">Registros</button>
     </nav>
   </div>
 
@@ -314,6 +331,31 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
     <div id="rede" class="nota larga"></div>
   </section>
 
+  <!-- ABA 4: REGISTROS (testes) -->
+  <section id="aba3" class="aba" role="tabpanel">
+    <div class="box larga">
+      <div class="rot">Tempo de resposta pela internet</div>
+      <div class="metricas">
+        <div><b id="rN">0</b><span>comandos</span></div>
+        <div><b id="rMed">—</b><span>média</span></div>
+        <div><b id="rMin">—</b><span>mínimo</span></div>
+        <div><b id="rMax">—</b><span>máximo</span></div>
+      </div>
+      <span class="sub">Do toque no site até o ESP32 confirmar (ida e volta pela nuvem). Conta os comandos desde que esta página foi aberta.</span>
+      <div class="acoes2"><button class="btn sec" onclick="baixaTempos()">Baixar tempos de resposta (CSV)</button></div>
+    </div>
+    <div class="box larga">
+      <div class="rot">Eventos do ESP32</div>
+      <span id="regInfo" class="sub"></span>
+      <div class="acoes2">
+        <button id="histBtn" class="btn prim" onclick="pedeHistorico()">Carregar histórico do ESP32</button>
+        <button class="btn sec" onclick="baixaEventos()">Baixar eventos (CSV)</button>
+      </div>
+      <div id="lista" class="lista"></div>
+      <div class="acoes2"><button class="link" style="color:var(--no)" onclick="apagaReg()">Apagar registros do ESP32</button></div>
+    </div>
+  </section>
+
   <div class="nota">Entrou como <b id="quem"></b> · <button class="link" onclick="sair()">Sair</button></div>
 </div>
 
@@ -321,7 +363,7 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
   <div class="box">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span id="mTit"></span></h2>
     <p id="mTxt"></p>
-    <p>Prefira limpar antes das 10h ou depois das 17h.</p>
+    <p id="mObs">Prefira limpar antes das 10h ou depois das 17h.</p>
     <div class="acoes">
       <button id="mNao" class="btn prim">Cancelar</button>
       <button id="mSim" class="btn perigo"></button>
@@ -347,12 +389,13 @@ let est={};
 /* ================= TELA ================= */
 function liga(id,on){ $(id).classList.toggle('on',!!on); $(id).setAttribute('aria-checked',!!on); }
 function aba(i){
-  for(let k=0;k<3;k++){
+  for(let k=0;k<4;k++){
     $('aba'+k).classList.toggle('ativa',k===i);
     $('tab'+k).classList.toggle('sel',k===i);
     $('tab'+k).setAttribute('aria-selected',k===i);
   }
   try{localStorage.setItem('aba',i)}catch(e){}
+  if(i===3) pintaLista(regLinhas);
   window.scrollTo(0,0);
 }
 function textoFuso(f){ return f===undefined?'':' (UTC'+(f>0?'−':'+')+Math.abs(f/60)+')'; }
@@ -385,6 +428,7 @@ function pinta(s){
 
   [1,2].forEach(n=>{ liga('b'+n,s['b'+n]); $('t'+n).textContent=s['b'+n]?'ligada':'desligada'; });
   $('parar').classList.toggle('ativo',rodando||s.b1||s.b2);
+  $('regInfo').textContent=textoRegInfo(s);
   $('rede').textContent=s.wifi?'Placa no Wi-Fi "'+s.wifi+'" · sinal '+s.rssi+' dBm':'';
 }
 function textoCiclo(t){ return 'Ciclo total '+(t*2+15)+' s · detergente '+t+' s · pausa 15 s · água '+t+' s'; }
@@ -452,8 +496,9 @@ function horaAgora(){
   const d=new Date(); return {h:d.getHours(),m:d.getMinutes()};
 }
 function solForte(h){ return h>=SOL_INI && h<SOL_FIM; }
-function perguntaSol(titulo,texto,botao,seguir,cancelar){
+function perguntaSol(titulo,texto,botao,seguir,cancelar,obs){
   $('mTit').textContent=titulo; $('mTxt').textContent=texto; $('mSim').textContent=botao;
+  $('mObs').textContent=obs===undefined?'Prefira limpar antes das 10h ou depois das 17h.':obs;
   aoCancelar=cancelar||null;
   $('mSim').onclick=()=>{ fechaSol(); seguir(); };
   $('mNao').onclick=()=>{ fechaSol(); if(aoCancelar) aoCancelar(); };
@@ -502,7 +547,7 @@ let esperandoId=0, guardado=null, tEspera=null, tEsp=null;
 function publica(q){
   if(!cli||!cli.connected||espOnline!==true) return false;
   const id=(Date.now()%1000000000)||1;
-  esperandoId=id;
+  esperandoId=id; enviados[id]={t:performance.now(),q};
   cli.publish(T+'cmd', q+'&id='+id, {qos:1});
   clearTimeout(tEspera);
   tEspera=setTimeout(()=>{ esperandoId=0; if(guardado){ const g=guardado; guardado=null; pinta(g); } },5000);
@@ -512,8 +557,10 @@ function publica(q){
 function recebe(topico,dados){
   const txt=dados.toString();
   if(topico===T+'online'){ espOnline=(txt==='1'); clearTimeout(tEsp); atualizaCon(); talvezAcerte(); return; }
+  if(recebeReg(topico,txt)) return;
   if(topico!==T+'status') return;
   let s; try{ s=JSON.parse(txt); }catch(e){ return; }
+  medeResposta(s);
   if(esperandoId && s.ack!==esperandoId){ guardado=s; return; }   // estado de antes do último toque
   esperandoId=0; guardado=null; clearTimeout(tEspera);
   pinta(s);
@@ -566,7 +613,7 @@ function conectar(l){
   c.on('connect',()=>{
     if(c!==cli) return;
     jaConectou=true; falhasIni=0;
-    c.subscribe([T+'status',T+'online'],{qos:1});
+    c.subscribe([T+'status',T+'online',T+'log',T+'hist'],{qos:1});
     clearTimeout(tEsp);   // se em 6 s não vier "online", o ESP32 nunca se conectou
     tEsp=setTimeout(()=>{ if(espOnline===null){ espOnline=false; atualizaCon(); } },6000);
     atualizaCon();
@@ -636,6 +683,91 @@ function sair(){
 }
 
 /* ================= TEMA ================= */
+
+/* ================= REGISTROS (aba 4) ================= */
+const NOME_EV={ligou:'ESP32 ligou',wifi_on:'Wi-Fi conectado',wifi_off:'Wi-Fi caiu',nuvem_on:'Nuvem conectada',
+  nuvem_off:'Nuvem caiu',nuvem_falha:'Falha ao conectar na nuvem',relogio_ok:'Relógio acertado',
+  limpeza_inicio:'Limpeza iniciada',limpeza_fim:'Limpeza concluída',limpeza_interrompida:'Limpeza interrompida',
+  comando_ignorado:'Comando ignorado',bomba:'Bomba (manual)',bombas_desligadas:'Bombas desligadas',
+  seguranca:'Desligamento de segurança',chuva_molhou:'Sensor molhou',chuva_secou:'Sensor secou',
+  chuva_bloqueada:'Chuva bloqueada (10h–17h)',leitura:'Leitura do sensor',config:'Configuração alterada',
+  registros_apagados:'Registros apagados'};
+const ORIGEM={auto:'automático',botao:'botão da placa',site_local:'site local',internet:'internet'};
+const CAB_REG='data_hora;uptime_s;evento;origem;detalhe;leitura_chuva;rssi_dbm';
+function pintaLista(linhas){
+  const el=$('lista'); el.textContent='';
+  const vis=linhas.filter(l=>l.split(';')[2]!=='leitura').slice(-60).reverse();   // leituras periódicas só no CSV
+  if(!vis.length){ const s=document.createElement('span'); s.className='sub'; s.textContent='Nenhum evento ainda.'; el.append(s); return; }
+  for(const l of vis){
+    const c=l.split(';'); if(c.length<5) continue;
+    const ev=document.createElement('div');
+    ev.className='ev'+(/falha|_off|seguranca|interrompida|bloqueada|ignorado/.test(c[2])?' ruim':/limpeza_fim|_on$|relogio_ok/.test(c[2])?' bom':'');
+    const q=document.createElement('span'); q.className='q';
+    q.textContent=c[0]?c[0].slice(11,19)+'\n'+c[0].slice(8,10)+'/'+c[0].slice(5,7):'+'+c[1]+' s\n(sem hora)';
+    const t=document.createElement('b'); t.textContent=NOME_EV[c[2]]||c[2];
+    const d=document.createElement('span'); d.className='d';
+    d.textContent=[c[4],ORIGEM[c[3]]||c[3],'chuva '+c[5]].filter(Boolean).join(' · ');
+    ev.append(q,t,d); el.append(ev);
+  }
+}
+function baixa(nome,linhas){   /* CSV com ; e BOM: abre direto no Excel em português */
+  const blob=new Blob(['﻿'+linhas.join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nome;
+  document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+}
+function hoje(){ const d=new Date(); return d.getFullYear()+'-'+dd(d.getMonth()+1)+'-'+dd(d.getDate())+'_'+dd(d.getHours())+'h'+dd(d.getMinutes()); }
+function textoRegInfo(s){
+  return s.reg?('Gravados na memória do ESP32: '+s.regKB+' KB (guarda até ~600 KB; os mais antigos saem primeiro).')
+              :'A memória de registros do ESP32 não iniciou: eles só aparecem no Monitor Serial.';
+}
+
+let regLinhas=[], regVistos=new Set(), histBuf=null, tHist=null;
+const tempos=[], enviados={};
+function addReg(l){ l=l.trim(); if(!l||regVistos.has(l)) return; regVistos.add(l); regLinhas.push(l); }
+function recebeReg(topico,txt){
+  if(topico===T+'log'){ addReg(txt); if($('aba3').classList.contains('ativa')) pintaLista(regLinhas); return true; }
+  if(topico!==T+'hist') return false;
+  if(txt.startsWith('#fim')){
+    const h=histBuf||[], vistos=new Set(h); histBuf=null; clearTimeout(tHist);
+    regLinhas=h.concat(regLinhas.filter(l=>!vistos.has(l))); regVistos=new Set(regLinhas);
+    pintaLista(regLinhas);
+    $('histBtn').disabled=false; $('histBtn').textContent='Carregar histórico do ESP32 ('+h.length+' eventos)';
+    return true;
+  }
+  (histBuf=histBuf||[]).push(...txt.split('\n').map(l=>l.trim()).filter(Boolean));
+  return true;
+}
+function pedeHistorico(){
+  if(!publica('a=hist&n=500')) return;
+  histBuf=[]; $('histBtn').disabled=true; $('histBtn').textContent='Carregando…';
+  clearTimeout(tHist); tHist=setTimeout(()=>{ $('histBtn').disabled=false; $('histBtn').textContent='Carregar histórico do ESP32'; },15000);
+}
+function baixaEventos(){ baixa('registros_esp32_'+hoje()+'.csv',[CAB_REG].concat(regLinhas)); }
+function apagaReg(){
+  perguntaSol('Apagar os registros?','Isso apaga todos os registros gravados no ESP32.','Apagar registros',
+    ()=>{ if(publica('a=apagarlog')){ regLinhas=[]; regVistos=new Set(); pintaLista(regLinhas); } },null,
+    'Se for usar nos testes do TCC, baixe o CSV antes.');
+}
+/* tempo de resposta: do toque até o estado com o mesmo "ack" voltar do ESP32 */
+function medeResposta(s){
+  const e=enviados[s.ack]; if(!e) return;
+  delete enviados[s.ack];
+  if(/^(t=|a=hist)/.test(e.q)) return;
+  tempos.push({quando:new Date(),comando:e.q,ms:Math.round(performance.now()-e.t)});
+  pintaTempos();
+}
+function pintaTempos(){
+  const v=tempos.map(x=>x.ms), n=v.length;
+  $('rN').textContent=n;
+  $('rMed').textContent=n?Math.round(v.reduce((a,b)=>a+b,0)/n)+' ms':'—';
+  $('rMin').textContent=n?Math.min(...v)+' ms':'—';
+  $('rMax').textContent=n?Math.max(...v)+' ms':'—';
+}
+function baixaTempos(){
+  baixa('tempo_resposta_'+hoje()+'.csv',['data_hora_celular;comando;tempo_resposta_ms'].concat(tempos.map(x=>{
+    const d=x.quando; return d.getFullYear()+'-'+dd(d.getMonth()+1)+'-'+dd(d.getDate())+' '+dd(d.getHours())+':'+dd(d.getMinutes())+':'+dd(d.getSeconds())+'.'+String(d.getMilliseconds()).padStart(3,'0')+';'+x.comando+';'+x.ms; })));
+}
+
 function trocaTema(){
   const r=document.documentElement, novo=r.getAttribute('data-tema')==='claro'?'escuro':'claro';
   r.setAttribute('data-tema',novo);
@@ -650,7 +782,7 @@ function corBarra(){
 /* ================= INÍCIO ================= */
 corBarra();
 let inicial=0; try{inicial=+(localStorage.getItem('aba')||0)}catch(e){}
-aba(inicial>=0&&inicial<3?inicial:0);
+aba(inicial>=0&&inicial<4?inicial:0);
 if(typeof mqtt==='undefined'){
   mostraLogin('Não carregou o arquivo mqtt.min.js. Ele precisa estar na mesma pasta do index.html.');
   $('lbtn').disabled=true;
