@@ -688,25 +688,29 @@ function sair(){
 const NOME_EV={ligou:'ESP32 ligou',wifi_on:'Wi-Fi conectado',wifi_off:'Wi-Fi caiu',nuvem_on:'Nuvem conectada',
   nuvem_off:'Nuvem caiu',nuvem_falha:'Falha ao conectar na nuvem',relogio_ok:'Relógio acertado',
   limpeza_inicio:'Limpeza iniciada',limpeza_fim:'Limpeza concluída',limpeza_interrompida:'Limpeza interrompida',
-  comando_ignorado:'Comando ignorado',bomba:'Bomba (manual)',bombas_desligadas:'Bombas desligadas',
+  comando_ignorado:'Comando ignorado',bomba_liga:'Bomba ligada',bomba_desliga:'Bomba desligada',
   seguranca:'Desligamento de segurança',chuva_molhou:'Sensor molhou',chuva_secou:'Sensor secou',
   chuva_bloqueada:'Chuva bloqueada (10h–17h)',leitura:'Leitura do sensor',config:'Configuração alterada',
   registros_apagados:'Registros apagados'};
-const ORIGEM={auto:'automático',botao:'botão da placa',site_local:'site local',internet:'internet'};
-const CAB_REG='data_hora;uptime_s;evento;origem;detalhe;leitura_chuva;rssi_dbm';
+const ORIGEM={auto:'',botao:'pelo botão da placa',site_local:'pelo site local',internet:'pela internet'};
+const MODO={manual:'modo manual',horario:'modo horário',chuva:'modo chuva',botao:'modo botão',manual_bomba:'bomba manual',seguranca:'segurança'};
+const CAB_REG='data_hora;uptime_ms;evento;modo;origem;bomba1_detergente;bomba2_agua;etapa;leitura_chuva;sensor;detalhe;rssi_dbm';
 function pintaLista(linhas){
   const el=$('lista'); el.textContent='';
   const vis=linhas.filter(l=>l.split(';')[2]!=='leitura').slice(-60).reverse();   // leituras periódicas só no CSV
   if(!vis.length){ const s=document.createElement('span'); s.className='sub'; s.textContent='Nenhum evento ainda.'; el.append(s); return; }
   for(const l of vis){
-    const c=l.split(';'); if(c.length<5) continue;
+    /* colunas: 0 data_hora, 1 uptime_ms, 2 evento, 3 modo, 4 origem, 5 bomba1, 6 bomba2, 7 etapa, 8 leitura, 9 sensor, 10 detalhe */
+    const c=l.split(';'); if(c.length<11) continue;
     const ev=document.createElement('div');
     ev.className='ev'+(/falha|_off|seguranca|interrompida|bloqueada|ignorado/.test(c[2])?' ruim':/limpeza_fim|_on$|relogio_ok/.test(c[2])?' bom':'');
     const q=document.createElement('span'); q.className='q';
-    q.textContent=c[0]?c[0].slice(11,19)+'\n'+c[0].slice(8,10)+'/'+c[0].slice(5,7):'+'+c[1]+' s\n(sem hora)';
+    q.textContent=c[0]?c[0].slice(11,19)+'\n'+c[0].slice(8,10)+'/'+c[0].slice(5,7):'+'+Math.round(c[1]/1000)+' s\n(sem hora)';
     const t=document.createElement('b'); t.textContent=NOME_EV[c[2]]||c[2];
     const d=document.createElement('span'); d.className='d';
-    d.textContent=[c[4],ORIGEM[c[3]]||c[3],'chuva '+c[5]].filter(Boolean).join(' · ');
+    d.textContent=[c[10],MODO[c[3]],ORIGEM[c[4]],
+      'B1 '+(c[5]==='1'?'ligada':'desl.')+' · B2 '+(c[6]==='1'?'ligada':'desl.'),
+      'chuva '+c[8]+' ('+c[9]+')'].filter(Boolean).join(' · ');
     ev.append(q,t,d); el.append(ev);
   }
 }
@@ -717,7 +721,7 @@ function baixa(nome,linhas){   /* CSV com ; e BOM: abre direto no Excel em portu
 }
 function hoje(){ const d=new Date(); return d.getFullYear()+'-'+dd(d.getMonth()+1)+'-'+dd(d.getDate())+'_'+dd(d.getHours())+'h'+dd(d.getMinutes()); }
 function textoRegInfo(s){
-  return s.reg?('Gravados na memória do ESP32: '+s.regKB+' KB (guarda até ~600 KB; os mais antigos saem primeiro).')
+  return s.reg?('Gravados na memória do ESP32: '+s.regKB+' KB (guarda até ~1 MB; os mais antigos saem primeiro).')
               :'A memória de registros do ESP32 não iniciou: eles só aparecem no Monitor Serial.';
 }
 
