@@ -97,6 +97,69 @@ Comportamentos normais:
 - **O ESP32 não tenta se conectar à nuvem com bomba ligada.** Conectar trava o programa por 1 a 3 s, então ele espera o ciclo acabar.
 - **Comandos enviados com o ESP32 offline não ficam guardados para depois.** Isso evita a bomba ligar horas mais tarde, quando a internet voltar. Por isso o site trava os botões enquanto o ESP32 está fora do ar.
 
+## Aviso de sol forte (choque térmico)
+
+Entre **10h e 17h**, no horário do local da placa (relógio do ESP32), os dois sites, o local e o da internet, pedem confirmação antes de:
+- **Iniciar limpeza**;
+- **ligar a Bomba 1 ou a Bomba 2** na aba Manual (desligar nunca pergunta);
+- **programar o horário automático** dentro dessa faixa. Se você confirmar, fica um alerta fixo embaixo do relógio.
+
+O motivo: com sol forte o vidro da placa fica muito quente. A água fria pode causar choque térmico (microfissuras no vidro e nas células) e manchas, porque evapora rápido demais. Depois de confirmar, o site não pergunta de novo por 10 minutos, para você poder testar as bombas.
+
+É só um aviso: se você confirmar, a limpeza acontece. O **botão BOOT** da placa não avisa, porque não tem tela.
+
+### Limpeza por chuva entre 10h e 17h
+
+Na aba **Automático**, dentro de "Quando chover", o interruptor **Permitir entre 10h e 17h** decide se a chuva pode disparar a limpeza nesse período.
+- **Desligado (padrão):** se chover entre 10h e 17h, o ESP32 **não** limpa. Se ainda estiver molhado às 17h, ele limpa nessa hora. Enquanto espera, o site mostra "Chovendo agora: a limpeza espera passar das 17h".
+- **Ligado:** a chuva dispara a limpeza a qualquer hora. Para ligar, o site pede confirmação.
+
+Essa regra roda no próprio ESP32 e fica salva na memória: vale mesmo com o site fechado e depois de reiniciar. Se o relógio da placa ainda não tiver acertado, ela não sabe que horas são e deixa a chuva limpar normalmente.
+
+A faixa de horário fica em `SOL_INI` e `SOL_FIM` no JavaScript das duas páginas (para os avisos) e em `SOL_INI_H` e `SOL_FIM_H` no firmware (para a regra da chuva). Se mudar, mude nos três lugares.
+
+## Registros para os testes (TCC v2.1)
+
+O ESP32 grava cada evento numa planilha CSV dentro da própria memória flash. Os registros continuam lá depois de desligar a placa.
+
+**Onde baixar:**
+- **Site local** (rede LimpezaSolar ou IP do ESP32 no Wi-Fi do local): aba **Registros → Baixar todos os registros (CSV)**, ou direto em `http://192.168.4.1/registros.csv`.
+- **Site da internet:** aba **Registros → Carregar histórico do ESP32** (últimos 500 eventos) **→ Baixar eventos (CSV)**. Na mesma aba ficam o **tempo de resposta** de cada comando e o botão **Baixar tempos de resposta (CSV)**.
+
+Os arquivos usam `;` como separador e abrem direto no Excel em português.
+
+**Colunas:** `data_hora; uptime_s; evento; origem; detalhe; leitura_chuva; rssi_dbm`
+- `uptime_s` são os segundos desde que o ESP32 ligou. Serve para os eventos de antes do relógio acertar, que ficam com `data_hora` vazia.
+- `origem` diz quem causou o evento: `auto`, `botao`, `site_local` ou `internet`.
+
+| evento | quando acontece | detalhe |
+|---|---|---|
+| `ligou` | o ESP32 ligou ou reiniciou | versão, **motivo do reset** (energia, watchdog, **queda de tensão**...), memória livre |
+| `wifi_on` / `wifi_off` | conectou / caiu o Wi-Fi do local | IP e **tempo para conectar** |
+| `nuvem_on` / `nuvem_off` / `nuvem_falha` | conexão com o EMQX | **tempo da conexão TLS**, código de erro |
+| `relogio_ok` | relógio acertado | fonte: `internet_ntp` ou `celular` |
+| `limpeza_inicio` | começou um ciclo | motivo (manual, horário, chuva, botão), tempo de bomba, duração prevista |
+| `limpeza_fim` | ciclo terminou | **tempo medido de cada etapa**, total, previsto e **erro em ms** |
+| `limpeza_interrompida` | ciclo parado no meio | etapa e quanto tempo já tinha rodado |
+| `bomba` / `bombas_desligadas` | bomba ligada/desligada à mão | qual bomba |
+| `seguranca` | bomba desligada pelo limite de 60 s | qual bomba |
+| `chuva_molhou` / `chuva_secou` | sensor mudou de estado (após 3 s estável) | leitura na coluna `leitura_chuva` |
+| `chuva_bloqueada` | choveu entre 10h e 17h com a opção desligada | |
+| `leitura` | a cada 5 min | leitura do sensor (só no CSV, não aparece na lista) |
+| `config` | alguma configuração mudou | o que mudou (ex.: `horario=06:30 tc=10`) |
+| `comando_ignorado` | pediu limpeza com outra em andamento | |
+
+**Ideias de testes** (cada um sai pronto de um filtro na planilha):
+1. **Precisão do ciclo:** faça 10 limpezas de 5 s e 10 de 10 s, filtre `limpeza_fim` e calcule média e desvio do `erro_ms`.
+2. **Tempo de resposta pela internet:** faça 20 comandos pelo site no 4G e no Wi-Fi e compare média, mínimo e máximo do CSV de tempos.
+3. **Detecção de chuva:** pingue água e compare a hora de `chuva_molhou` com a de `limpeza_inicio` (motivo=chuva). O esperado é cerca de 10 s.
+4. **Bloqueio por sol forte:** entre 10h e 17h, com a opção desligada, molhe o sensor. Deve aparecer `chuva_bloqueada` e **nenhuma** `limpeza_inicio`.
+5. **Segurança:** ligue uma bomba manualmente e espere. Deve aparecer `seguranca` em cerca de 60 s.
+6. **Queda e recuperação:** desligue o roteador por 1 minuto e religue. Meça o tempo entre `wifi_off`, `wifi_on` e `nuvem_on`.
+7. **Horário programado:** programe para daqui a 2 minutos e confira `limpeza_inicio` com motivo=horário no minuto certo.
+
+> A memória guarda cerca de 600 KB, o que dá semanas de uso normal. Quando enche, os registros mais antigos saem primeiro. Antes de uma bateria de testes, use **Apagar registros** para começar com a planilha limpa. Na Arduino IDE, mantenha um *Partition Scheme* que tenha SPIFFS (o padrão tem).
+
 ## Segurança
 
 - Senhas só no `segredos.h` (ESP32) e no navegador de quem faz login. O site publicado não contém nenhuma.
