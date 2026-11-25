@@ -156,6 +156,19 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
 .lembrar input{width:20px;height:20px;accent-color:var(--ok)}
 .erro{min-height:20px;margin:12px 0 10px;font-size:14px;color:var(--no)}
 
+[hidden]{display:none!important}
+/* ---------- aviso de sol forte (choque térmico) ---------- */
+.alerta{color:var(--no)}
+.item b.menor{font-size:16px}
+.modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.6)}
+.modal .box{background:var(--bg);width:100%;max-width:420px;padding:20px}
+.modal h2{display:flex;align-items:center;gap:8px;font-size:19px;color:var(--no);margin-bottom:10px}
+.modal h2 svg{width:24px;height:24px;flex-shrink:0}
+.modal p{font-size:15px;line-height:1.45}
+.modal p+p{margin-top:8px;color:var(--mudo)}
+.modal .acoes{display:grid;gap:8px;margin-top:18px}
+.perigo{background:var(--no);color:var(--sobreNo)}
+.sec{background:transparent;border:1px solid var(--linha)}
 @media (min-width:720px){
   .app{max-width:720px}
   .aba.ativa{grid-template-columns:1fr 1fr}
@@ -233,7 +246,7 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
       <div id="dicam" class="dica"></div>
     </div>
     <div class="box">
-      <button id="limpar" class="btn prim" onclick="cmd('limpar')">Iniciar limpeza</button>
+      <button id="limpar" class="btn prim" onclick="limpar()">Iniciar limpeza</button>
       <div class="barra"><i id="prog"></i></div>
       <div id="ultima" class="dica"></div>
     </div>
@@ -252,6 +265,7 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
         <label class="campo"><select id="mm" aria-label="Minuto da limpeza" onchange="mudaHora()"></select>minuto</label>
       </div>
       <span id="relogio" class="sub" style="text-align:center;margin-top:10px"></span>
+      <span id="avisoHora" class="sub alerta" style="text-align:center" hidden>⚠ Horário de sol forte (10h–17h): risco de choque térmico na placa</span>
       <div class="modo">
         <div class="rot">Tempo de cada bomba</div>
         <div id="segh" class="seg" role="radiogroup" aria-label="Tempo da limpeza programada">
@@ -268,6 +282,13 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
           <span id="chuvaN" class="sub"></span></span>
         <span id="ac" class="sw" role="switch" aria-label="Limpar quando chover"></span>
       </button>
+      <div class="modo">
+        <button class="item" onclick="tgChuvaSol()">
+          <span><b class="menor">Permitir entre 10h e 17h</b>
+            <span id="csS" class="sub"></span></span>
+          <span id="cs" class="sw" role="switch" aria-label="Permitir limpeza por chuva entre 10h e 17h"></span>
+        </button>
+      </div>
       <div class="modo">
         <div class="rot">Tempo de cada bomba</div>
         <div id="segc" class="seg" role="radiogroup" aria-label="Tempo da limpeza por chuva">
@@ -294,6 +315,18 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
   </section>
 
   <div class="nota">Entrou como <b id="quem"></b> · <button class="link" onclick="sair()">Sair</button></div>
+</div>
+
+<div id="modal" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTit" aria-describedby="mTxt" hidden>
+  <div class="box">
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span id="mTit"></span></h2>
+    <p id="mTxt"></p>
+    <p>Prefira limpar antes das 10h ou depois das 17h.</p>
+    <div class="acoes">
+      <button id="mNao" class="btn prim">Cancelar</button>
+      <button id="mSim" class="btn perigo"></button>
+    </div>
+  </div>
 </div>
 
 <div class="rodape"><button id="parar" class="btn parar" onclick="cmd('parar')">Parar tudo</button></div>
@@ -341,12 +374,13 @@ function pinta(s){
   $('prog').style.width=s.prog+'%';
   $('ultima').textContent=s.ultima?'Última limpeza: '+s.ultima:'';
 
-  liga('ah',s.autoHora); liga('ac',s.autoChuva);
-  if(document.activeElement!==$('hh')&&document.activeElement!==$('mm')){
+  liga('ah',s.autoHora); liga('ac',s.autoChuva); pintaChuvaSol();
+  if(document.activeElement!==$('hh')&&document.activeElement!==$('mm')&&$('modal').hidden){
     const p=s.hora.split(':'); $('hh').value=p[0]; $('mm').value=p[1];
   }
   $('relogio').textContent=s.relogio?'Relógio do ESP32: '+s.relogio+textoFuso(s.fuso):'Relógio do ESP32 ainda não acertado';
   $('relogio').style.color=s.relogio?'':'var(--no)';
+  notaHora();
   $('chuvaN').textContent='Leitura agora: '+s.chuva;
 
   [1,2].forEach(n=>{ liga('b'+n,s['b'+n]); $('t'+n).textContent=s['b'+n]?'ligada':'desligada'; });
@@ -372,8 +406,13 @@ function pintaSeg(m,t,trava){
 function cmd(a){ publica('a='+a); }
 function cfg(q){ publica(q); }
 function tg(n){
-  const k='b'+n, on=!est[k];
-  est[k]=on; liga(k,on); $('t'+n).textContent=on?'ligada':'desligada';
+  const on=!est['b'+n];
+  if(on) comAvisoSol('Ligar a bomba '+n,()=>trocaBomba(n,true));   // desligar nunca pergunta
+  else trocaBomba(n,false);
+}
+function trocaBomba(n,on){
+  const k='b'+n;
+  est[k]=on; liga(k,on); $('t'+n).textContent=on?'ligada':'desligada';   // muda na hora
   $('parar').classList.toggle('ativo',est.b1||est.b2||est.etapa!=='Parado');
   cmd(k+(on?'on':'off'));
 }
@@ -385,14 +424,72 @@ function tempo(m,t){
   cfg(k+'='+t);
 }
 function autoTg(campo,id,chave){
-  est[campo]=!est[campo]; liga(id,est[campo]);
+  est[campo]=!est[campo]; liga(id,est[campo]); notaHora();
   cfg(chave+'='+(est[campo]?1:0));
 }
 function mudaHora(){
-  est.hora=$('hh').value+':'+$('mm').value;
-  cfg('h='+(+$('hh').value)+'&m='+(+$('mm').value));
+  const h=+$('hh').value, m=+$('mm').value;
   document.activeElement.blur();
+  const aplica=()=>{ est.hora=dd(h)+':'+dd(m); cfg('h='+h+'&m='+m); notaHora(); };
+  if(solForte(h+m/60))
+    perguntaSol('Horário de sol forte',
+      'A limpeza programada para '+dd(h)+':'+dd(m)+' cai no período mais quente do dia. '+TXT_SOL,
+      'Usar este horário', aplica,
+      ()=>{ const p=(est.hora||'06:00').split(':'); $('hh').value=p[0]; $('mm').value=p[1]; });   // volta ao anterior
+  else aplica();
 }
+
+/* ---- aviso de choque térmico: limpar entre 10h e 17h ----
+   Usa o relógio do ESP32 (horário do local da placa); se ele ainda não acertou, o deste aparelho.
+   Depois de confirmar, não pergunta de novo por 10 min (para testar as bombas sem ficar repetindo). */
+const SOL_INI=10, SOL_FIM=17, SOL_PAUSA=10*60000;
+const TXT_SOL='Nesse horário a placa costuma estar muito quente. Água fria no vidro quente pode causar choque térmico '+
+  '(microfissuras no vidro e nas células) e deixar manchas, porque a água evapora rápido demais.';
+const dd=n=>String(n).padStart(2,'0');
+let solOkAte=0, aoCancelar=null;
+function horaAgora(){
+  if(est.relogio){ const p=est.relogio.split(':'); return {h:+p[0],m:+p[1]}; }
+  const d=new Date(); return {h:d.getHours(),m:d.getMinutes()};
+}
+function solForte(h){ return h>=SOL_INI && h<SOL_FIM; }
+function perguntaSol(titulo,texto,botao,seguir,cancelar){
+  $('mTit').textContent=titulo; $('mTxt').textContent=texto; $('mSim').textContent=botao;
+  aoCancelar=cancelar||null;
+  $('mSim').onclick=()=>{ fechaSol(); seguir(); };
+  $('mNao').onclick=()=>{ fechaSol(); if(aoCancelar) aoCancelar(); };
+  $('modal').hidden=false; $('mNao').focus();
+}
+function fechaSol(){ $('modal').hidden=true; }
+function comAvisoSol(oque,acao){
+  const a=horaAgora();
+  if(!solForte(a.h+a.m/60) || Date.now()<solOkAte){ acao(); return; }
+  perguntaSol('Sol forte: risco de choque térmico',
+    'Agora são '+dd(a.h)+':'+dd(a.m)+' no local da placa. '+TXT_SOL,
+    oque+' mesmo assim', ()=>{ solOkAte=Date.now()+SOL_PAUSA; acao(); });
+}
+function limpar(){ comAvisoSol('Limpar',()=>cmd('limpar')); }
+/* chuva entre 10h e 17h: a decisão fica no ESP32 (opção cs); aqui só o interruptor */
+function pintaChuvaSol(){
+  liga('cs',est.chuvaSol);
+  $('csS').textContent=est.chuvaEspera?'Chovendo agora: a limpeza espera passar das 17h'
+    :est.chuvaSol?'Ligado: a chuva dispara a limpeza a qualquer hora'
+    :'Desligado: entre 10h e 17h a chuva não dispara a limpeza';
+  $('csS').classList.toggle('alerta',!!est.chuvaEspera);
+}
+function tgChuvaSol(){
+  const troca=()=>{ est.chuvaSol=!est.chuvaSol; pintaChuvaSol(); cfg('cs='+(est.chuvaSol?1:0)); };
+  if(est.chuvaSol){ troca(); return; }   // desligar nunca pergunta
+  perguntaSol('Chuva com sol forte',
+    'Quando a chuva começa entre 10h e 17h, a placa ainda pode estar muito quente. Água fria no vidro quente pode causar '+
+    'choque térmico (microfissuras no vidro e nas células).',
+    'Permitir mesmo assim', troca);
+}
+function notaHora(){
+  const p=(est.hora||'').split(':'), forte=p.length===2&&solForte(+p[0]+(+p[1])/60);
+  $('avisoHora').hidden=!(forte&&est.autoHora);
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('modal').hidden) $('mNao').click(); });
+$('modal').addEventListener('click',e=>{ if(e.target===$('modal')) $('mNao').click(); });   // toque fora = cancelar
 
 /* ================= MQTT =================
    - "status" e "online" chegam "retidos": ao entrar, o EMQX já entrega o último estado.
