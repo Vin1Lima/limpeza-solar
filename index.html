@@ -635,6 +635,7 @@ function conectar(l){
   c.on('connect',()=>{
     if(c!==cli) return;
     jaConectou=true; falhasIni=0;
+    ls('mqttUsuario',l.user);   // guarda o nome do jeito que o EMQX aceitou
     c.subscribe([T+'status',T+'online',T+'log',T+'hist'],{qos:1});
     clearTimeout(tEsp);   // se em 6 s não vier "online", o ESP32 nunca se conectou
     tEsp=setTimeout(()=>{ if(espOnline===null){ espOnline=false; atualizaCon(); } },6000);
@@ -643,8 +644,15 @@ function conectar(l){
   c.on('message',(t,d)=>{ if(c===cli) recebe(t,d); });
   c.on('error',e=>{
     if(c!==cli) return;
-    if(e&&(e.code===4||e.code===5||/not authorized|bad user/i.test(e.message||'')))
+    if(e&&(e.code===4||e.code===5||/not authorized|bad user/i.test(e.message||''))){
+      // O EMQX diferencia maiúsculas no usuário: tenta a próxima forma do nome (vini, Vini...)
+      if(l.alternativas&&l.alternativas.length){
+        cli=null; c.end(true);
+        conectar(Object.assign({},l,{user:l.alternativas[0],alternativas:l.alternativas.slice(1)}));
+        return;
+      }
       desiste('Usuário ou senha incorretos. Confira em Access Control → Authentication no EMQX.',true);
+    }
   });
   c.on('close',()=>{
     if(c!==cli) return;
@@ -694,6 +702,11 @@ $('flogin').addEventListener('submit',ev=>{
   ev.preventDefault();
   const l={host:CLUSTER||$('lhost').value.trim(), user:$('luser').value.trim(), pass:$('lpass').value};
   if(!l.host||!l.user||!l.pass) return;
+  // Usuário sem diferenciar maiúsculas: "VINI", "vini" e "Vini" entram na mesma conta.
+  // (A senha continua diferenciando.)
+  const d=l.user, formas=[d.toLowerCase(), d, d.charAt(0).toUpperCase()+d.slice(1).toLowerCase()];
+  const unicas=formas.filter((x,i)=>formas.indexOf(x)===i);
+  l.user=unicas[0]; l.alternativas=unicas.slice(1);
   if(!CLUSTER) ls('mqttHost',l.host);
   ls('mqttUsuario',l.user);
   guardaSenha(l.pass,$('llembra').checked);
