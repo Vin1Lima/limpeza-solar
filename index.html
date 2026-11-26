@@ -391,6 +391,8 @@ a.btn.prim{color:var(--sobreOk)}
    Para outra placa, abra o site com ?id=placa02 no fim do endereço. */
 const CLUSTER = 'm182fe11.ala.us-east-1.emqxsl.com';
 const DISPOSITIVO = new URLSearchParams(location.search).get('id') || 'placa01';
+/* Quem vê o "Modo teste do sensor de chuva" (nomes em minúsculas). Para liberar outra pessoa, é só incluir aqui. */
+const USUARIOS_TESTE = ['vini', 'iago'];
 const T = 'limpezasolar/' + DISPOSITIVO + '/';
 
 const $=id=>document.getElementById(id);
@@ -524,7 +526,7 @@ function comAvisoSol(oque,acao){
     oque+' mesmo assim', ()=>{ solOkAte=Date.now()+SOL_PAUSA; acao(); });
 }
 function limpar(){ comAvisoSol('Limpar',()=>cmd('limpar')); }
-/* ---- modo teste do sensor de chuva (só Vini) ---- */
+/* ---- modo teste do sensor de chuva (só para USUARIOS_TESTE) ---- */
 function pintaTeste(){
   liga('tx',est.teste);
   $('testeS').textContent=est.teste?'Ligado · desliga sozinho em '+est.testeMin+' min'
@@ -696,7 +698,7 @@ function mostraLogin(msg){
 function mostraPainel(user){
   $('login').hidden=true; $('painel').hidden=false;
   $('quem').textContent=user;
-  $('testeBox').hidden=(user||'').toLowerCase()!=='vini';   // modo teste: só para o usuário Vini
+  $('testeBox').hidden=!USUARIOS_TESTE.includes((user||'').toLowerCase());   // modo teste: só para os usuários da lista
 }
 $('flogin').addEventListener('submit',ev=>{
   ev.preventDefault();
