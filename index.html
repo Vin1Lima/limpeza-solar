@@ -570,7 +570,7 @@ function recebe(topico,dados){
 // deste aparelho, sem o fuso (para não mudar o horário da placa se você estiver em outro fuso).
 function talvezAcerte(){
   if(acertouRelogio||espOnline!==true||est.relogio!=='') return;
-  acertouRelogio=true; publica('t='+Math.floor(Date.now()/1000));
+  acertouRelogio=true; const a=Date.now(); publica('t='+Math.floor(a/1000)+'&ms='+(a%1000));
 }
 
 function atualizaCon(){
