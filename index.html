@@ -169,6 +169,7 @@ button.box{background:var(--suave);border:1px solid var(--linha);padding:16px;mi
 .modal .acoes{display:grid;gap:8px;margin-top:18px}
 .perigo{background:var(--no);color:var(--sobreNo)}
 .sec{background:transparent;border:1px solid var(--linha)}
+.sec:disabled{opacity:.5;cursor:default}
 .tabs{grid-template-columns:repeat(4,1fr)!important}
 .tabs button{font-size:13px!important}
 /* ---------- aba Registros ---------- */
@@ -315,6 +316,15 @@ a.btn.prim{color:var(--sobreOk)}
         <div id="dicac" class="dica"></div>
       </div>
     </div>
+    <div id="testeBox" class="box larga" hidden>
+      <button class="item" onclick="tgTeste()">
+        <span><b>Modo teste do sensor de chuva</b>
+          <span class="sub">Só para testes: a chuva dispara a limpeza a qualquer hora, sem esperar 30 min nem o bloqueio de 10h–17h, e rearma com 3 s seco.</span>
+          <span id="testeS" class="sub"></span></span>
+        <span id="tx" class="sw" role="switch" aria-label="Modo teste do sensor de chuva"></span>
+      </button>
+      <div class="acoes2"><button id="simBtn" class="btn sec" onclick="simulaChuva()">Simular chuva agora</button></div>
+    </div>
   </section>
 
   <!-- ABA 3: MANUAL -->
@@ -327,7 +337,7 @@ a.btn.prim{color:var(--sobreOk)}
       <span><b>Bomba 2</b><span class="sub">Água · <span id="t2">desligada</span></span></span>
       <span id="b2" class="sw" role="switch" aria-label="Bomba 2"></span>
     </button>
-    <div class="nota larga">Cada bomba desliga sozinha após 60 s</div>
+    <div class="nota larga">Só uma bomba liga por vez · cada uma desliga sozinha após 60 s</div>
     <div id="rede" class="nota larga"></div>
   </section>
 
@@ -417,7 +427,7 @@ function pinta(s){
   $('prog').style.width=s.prog+'%';
   $('ultima').textContent=s.ultima?'Última limpeza: '+s.ultima:'';
 
-  liga('ah',s.autoHora); liga('ac',s.autoChuva); pintaChuvaSol();
+  liga('ah',s.autoHora); liga('ac',s.autoChuva); pintaChuvaSol(); pintaTeste();
   if(document.activeElement!==$('hh')&&document.activeElement!==$('mm')&&$('modal').hidden){
     const p=s.hora.split(':'); $('hh').value=p[0]; $('mm').value=p[1];
   }
@@ -455,7 +465,8 @@ function tg(n){
   else trocaBomba(n,false);
 }
 function trocaBomba(n,on){
-  const k='b'+n;
+  const k='b'+n, o='b'+(3-n);
+  if(on&&est[o]){ est[o]=false; liga(o,false); $('t'+(3-n)).textContent='desligada'; }   // uma bomba por vez
   est[k]=on; liga(k,on); $('t'+n).textContent=on?'ligada':'desligada';   // muda na hora
   $('parar').classList.toggle('ativo',est.b1||est.b2||est.etapa!=='Parado');
   cmd(k+(on?'on':'off'));
@@ -513,6 +524,17 @@ function comAvisoSol(oque,acao){
     oque+' mesmo assim', ()=>{ solOkAte=Date.now()+SOL_PAUSA; acao(); });
 }
 function limpar(){ comAvisoSol('Limpar',()=>cmd('limpar')); }
+/* ---- modo teste do sensor de chuva (só Vini) ---- */
+function pintaTeste(){
+  liga('tx',est.teste);
+  $('testeS').textContent=est.teste?'Ligado · desliga sozinho em '+est.testeMin+' min'
+    :'Desligado · ao ligar, fica ativo por 2 h (e desliga se o ESP32 reiniciar)';
+  $('testeS').classList.toggle('alerta',!!est.teste);
+  $('simBtn').disabled=!est.teste||est.etapa!=='Parado';
+  $('simBtn').textContent=est.teste?'Simular chuva agora':'Simular chuva agora (ligue o modo teste)';
+}
+function tgTeste(){ est.teste=!est.teste; est.testeMin=120; pintaTeste(); cfg('tx='+(est.teste?1:0)); }
+function simulaChuva(){ if(est.teste&&est.etapa==='Parado') cmd('simchuva'); }
 /* chuva entre 10h e 17h: a decisão fica no ESP32 (opção cs); aqui só o interruptor */
 function pintaChuvaSol(){
   liga('cs',est.chuvaSol);
@@ -666,6 +688,7 @@ function mostraLogin(msg){
 function mostraPainel(user){
   $('login').hidden=true; $('painel').hidden=false;
   $('quem').textContent=user;
+  $('testeBox').hidden=(user||'').toLowerCase()!=='vini';   // modo teste: só para o usuário Vini
 }
 $('flogin').addEventListener('submit',ev=>{
   ev.preventDefault();
@@ -688,7 +711,7 @@ function sair(){
 const NOME_EV={ligou:'ESP32 ligou',wifi_on:'Wi-Fi conectado',wifi_off:'Wi-Fi caiu',nuvem_on:'Nuvem conectada',
   nuvem_off:'Nuvem caiu',nuvem_falha:'Falha ao conectar na nuvem',relogio_ok:'Relógio acertado',
   limpeza_inicio:'Limpeza iniciada',limpeza_fim:'Limpeza concluída',limpeza_interrompida:'Limpeza interrompida',
-  comando_ignorado:'Comando ignorado',bomba_liga:'Bomba ligada',bomba_desliga:'Bomba desligada',
+  comando_ignorado:'Comando ignorado',intertravamento:'Intertravamento (uma bomba por vez)',bomba_liga:'Bomba ligada',bomba_desliga:'Bomba desligada',
   seguranca:'Desligamento de segurança',chuva_molhou:'Sensor molhou',chuva_secou:'Sensor secou',
   chuva_bloqueada:'Chuva bloqueada (10h–17h)',leitura:'Leitura do sensor',config:'Configuração alterada',
   registros_apagados:'Registros apagados'};
